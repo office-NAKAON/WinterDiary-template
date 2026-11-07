@@ -1,0 +1,409 @@
+<style>
+  :root {
+    --ink: #1f2937;
+    --muted: #667085;
+    --line: rgba(31, 41, 55, 0.14);
+    --paper: rgba(255, 255, 255, 0.86);
+    --paper-strong: rgba(255, 255, 255, 0.94);
+    --primary: #0ea5e9;
+    --primary-dark: #0369a1;
+    --accent: #facc15;
+    --danger: #dc2626;
+    --ok: #059669;
+    font-family: "Hiragino Sans", "Yu Gothic", "Meiryo", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    background: #e0f2fe;
+  }
+
+  button, input, textarea, select {
+    font: inherit;
+  }
+
+  button {
+    border: 0;
+    cursor: pointer;
+  }
+
+  .app-shell {
+    min-height: 100vh;
+  }
+
+  .login-screen {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 32px;
+    background:
+      radial-gradient(circle at 18% 20%, rgba(250, 204, 21, 0.55), transparent 20%),
+      linear-gradient(135deg, #b7d3ea 0%, #edf5fb 48%, #f7e7d8 100%);
+  }
+
+  .login-card, .panel, .teacher-panel {
+    background: var(--paper-strong);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 18px;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(14px);
+  }
+
+  .login-card {
+    width: min(440px, 100%);
+    padding: 32px;
+  }
+
+  .eyebrow {
+    margin: 0 0 8px;
+    color: var(--primary-dark);
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  h1, h2, h3 {
+    margin: 0;
+    letter-spacing: 0;
+  }
+
+  h1 { font-size: 34px; }
+  h2 { font-size: 24px; }
+  h3 { font-size: 18px; }
+
+  label {
+    display: grid;
+    gap: 7px;
+    margin-top: 18px;
+    font-weight: 700;
+  }
+
+  input, textarea, select {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 13px;
+    background: rgba(255,255,255,0.92);
+    color: var(--ink);
+  }
+
+  textarea {
+    min-height: 138px;
+    resize: vertical;
+  }
+
+  .primary, .ghost, .tab, .small-button {
+    min-height: 42px;
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-weight: 700;
+  }
+
+  .primary {
+    width: 100%;
+    margin-top: 20px;
+    color: white;
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  }
+
+  .ghost {
+    width: 100%;
+    margin-top: 10px;
+    color: var(--primary-dark);
+    background: rgba(14, 165, 233, 0.12);
+  }
+
+  .message {
+    min-height: 22px;
+    color: var(--danger);
+    font-weight: 700;
+  }
+
+  .student-app {
+    min-height: 100vh;
+    padding: 28px;
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+  }
+
+  .theme-snow {
+    background: radial-gradient(circle at 75% 20%, #ffffff 0%, transparent 25%), linear-gradient(180deg, #a8cfe7, #e5f2fa 65%, #ffffff);
+  }
+  .theme-kotatsu {
+    background: radial-gradient(circle at 25% 75%, #edaa5d, transparent 30%), linear-gradient(135deg, #f8eddb, #dfb98c);
+  }
+  .theme-town {
+    background: radial-gradient(circle at 80% 45%, #ffe0a3, transparent 15%), linear-gradient(180deg, #344c75, #a9bbd3 65%, #e6eef5);
+  }
+  .theme-sunrise {
+    background: radial-gradient(circle at 65% 40%, #ffdf9e, transparent 22%), linear-gradient(180deg, #9bb6dc, #f7c7b2 65%, #e9f2fa);
+  }
+  .student-header, .teacher-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .student-header.panel {
+    min-height: 150px;
+    align-items: flex-end;
+    color: #0f172a;
+    background: linear-gradient(90deg, rgba(255,255,255,0.82), rgba(255,255,255,0.18));
+    border-color: rgba(255,255,255,0.42);
+    box-shadow: 0 16px 45px rgba(15, 23, 42, 0.12);
+  }
+
+  .student-header .ghost {
+    width: auto;
+    background: rgba(255,255,255,0.76);
+  }
+
+  .student-grid {
+    display: grid;
+    grid-template-columns: minmax(420px, 1fr) minmax(360px, 0.82fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .panel, .teacher-panel {
+    padding: 20px;
+  }
+
+  .student-app .calendar-panel {
+    background: rgba(255,255,255,0.80);
+    border-color: rgba(255,255,255,0.56);
+  }
+
+  .student-app .form-panel {
+    background: rgba(255,255,255,0.91);
+    border-color: rgba(255,255,255,0.68);
+  }
+
+  .theme-picker {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .theme-card {
+    min-height: 78px;
+    border: 2px solid transparent;
+    border-radius: 14px;
+    padding: 8px;
+    color: #111827;
+    text-align: left;
+    font-weight: 800;
+    box-shadow: inset 0 0 0 999px rgba(255,255,255,0.26);
+    background-size: cover;
+    background-position: center;
+    text-shadow: 0 1px 5px rgba(255,255,255,0.95);
+  }
+
+  .theme-card.active {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 999px rgba(255,255,255,0.36), 0 0 0 3px rgba(250,204,21,0.35);
+  }
+
+  .calendar {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .day {
+    min-height: 74px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px;
+    background: rgba(255,255,255,0.78);
+    text-align: left;
+    display: grid;
+    align-content: space-between;
+  }
+
+  .day:disabled {
+    opacity: 0.46;
+    cursor: not-allowed;
+  }
+
+  .day.today {
+    border-color: #fb923c;
+    box-shadow: 0 0 0 2px rgba(251,146,60,0.24);
+  }
+
+  .day.selected {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(14,165,233,0.25);
+  }
+
+  .status {
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .status.done { color: var(--ok); }
+  .status.missing { color: var(--muted); }
+  .status.comment { color: #a16207; }
+
+  .form-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 16px;
+  }
+
+  .form-actions .primary {
+    width: auto;
+    margin: 0;
+  }
+
+  .comment-box {
+    margin-top: 16px;
+    padding: 14px;
+    border-radius: 14px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+  }
+
+  .teacher-app {
+    min-height: 100vh;
+    padding: 24px;
+    background: #f8fafc;
+  }
+
+  .teacher-layout {
+    display: grid;
+    gap: 16px;
+  }
+
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tab {
+    background: #e2e8f0;
+    color: #334155;
+  }
+
+  .tab.active {
+    color: white;
+    background: #0f766e;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .stat {
+    padding: 16px;
+    border-radius: 14px;
+    background: white;
+    border: 1px solid var(--line);
+  }
+
+  .stat strong {
+    display: block;
+    font-size: 28px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 14px;
+    background: white;
+  }
+
+  th, td {
+    border: 1px solid #e2e8f0;
+    padding: 9px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    background: #f1f5f9;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: end;
+    margin: 14px 0;
+  }
+
+  .toolbar label {
+    margin: 0;
+    min-width: 220px;
+  }
+
+  .small-button {
+    background: #0f766e;
+    color: white;
+  }
+
+  .danger-text { color: var(--danger); font-weight: 800; }
+  .muted { color: var(--muted); }
+
+  /* Keep the winter scenery visible around the compact student workspace. */
+  .student-app { padding: 24px clamp(24px, 5vw, 88px) 160px; }
+  .student-header.panel {
+    min-height: 0;
+    max-width: 1080px;
+    margin: 0 auto 24px;
+    padding: 14px 18px;
+    align-items: center;
+  }
+  .student-header h1 { font-size: 24px; }
+  .student-header .eyebrow { margin-bottom: 4px; }
+  .student-header .ghost { margin: 0; }
+  .student-grid {
+    max-width: 1080px;
+    margin: 0 auto;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 24px;
+  }
+  .student-app .panel { backdrop-filter: blur(4px); }
+  .student-app .calendar-panel { background: rgba(255,255,255,0.72); }
+  .student-app .form-panel { background: rgba(255,255,255,0.84); }
+  .student-app h2 { font-size: 20px; }
+  .student-app .theme-card { min-height: 52px; font-size: 13px; }
+  .student-app .day { min-height: 58px; }
+  .student-app .form-panel label { margin-top: 12px; gap: 5px; font-size: 14px; }
+  .student-app .form-panel label:nth-of-type(-n+2) {
+    display: inline-grid;
+    width: calc(50% - 7px);
+    vertical-align: top;
+  }
+  .student-app .form-panel label:first-of-type { margin-right: 10px; }
+  .student-app .form-panel input { min-height: 42px; padding: 8px 10px; }
+  .student-app .form-panel textarea { min-height: 86px; padding: 10px; }
+  .student-app .form-panel .message:empty { display: none; }
+  .student-app .comment-box { margin-top: 12px; padding: 10px 12px; font-size: 14px; }
+  .student-app .comment-box p { margin: 6px 0 0; }
+  @media (max-width: 850px) {
+    .student-app { padding: 20px 20px 120px; }
+    .student-grid { grid-template-columns: 1fr; max-width: 560px; }
+    .student-header.panel { max-width: 560px; }
+    .student-header h1 { font-size: 20px; }
+    .student-header { flex-wrap: wrap; }
+  }
+
+  @media print {
+    body { background: white; }
+    .no-print { display: none !important; }
+    .teacher-app, .student-app { padding: 0; background: white; }
+    .teacher-panel, .panel { box-shadow: none; border: 0; }
+  }
+</style>

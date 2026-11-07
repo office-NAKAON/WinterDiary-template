@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <?!= include('style'); ?>
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <section class="login-screen">
+      <div class="login-card">
+        <p class="eyebrow">○年○組</p>
+        <h1>冬休み生活記録</h1>
+        <label>
+          <span>ログインID</span>
+          <input id="loginId" type="text" autocomplete="username" inputmode="numeric">
+        </label>
+        <label>
+          <span>パスワード</span>
+          <input id="password" type="password" autocomplete="current-password" inputmode="numeric">
+        </label>
+        <button class="primary" onclick="handleLogin()">ログイン</button>
+        <button id="setupButton" class="ghost" onclick="handleSetup()">初回セットアップ</button>
+        <p id="loginMessage" class="message"></p>
+      </div>
+    </section>
+  </div>
+  <?!= include('script'); ?>
+  <?!= include('omikuji'); ?>
+</body>
+</html>

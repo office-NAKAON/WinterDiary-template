@@ -1,0 +1,62 @@
+<style>
+.omikuji-dialog{border:1px solid #e2d7c5;border-radius:24px;padding:0;width:min(460px,calc(100% - 32px));max-height:calc(100dvh - 40px);overflow:auto;background:#fffdf8;color:#313b46;box-shadow:0 28px 90px #172d4555}
+.omikuji-dialog::backdrop{background:#152a3e66;backdrop-filter:blur(3px)}
+.omikuji-card{text-align:center;padding:30px;background:radial-gradient(circle at 100% 0,#f6e9d3,transparent 35%)}
+.omikuji-card h2{font-size:26px;margin:0 0 16px}.omikuji-card p{line-height:1.9}.omikuji-eyebrow{font-size:12px;color:#986c38;letter-spacing:.14em}.omikuji-emblem{font-size:42px;color:#a14446;margin:12px auto}.omikuji-deadline{font-size:12px;color:#73685a;background:#f3efe7;padding:12px;border-radius:10px}.omikuji-actions{display:grid;gap:10px;margin-top:22px}.omikuji-actions button{min-height:44px;border-radius:12px;padding:12px 20px;font-weight:bold;background:#f2eee8;color:#5c5150}.omikuji-actions .omikuji-primary{background:#963e40;color:white}.omikuji-card button:focus-visible{outline:3px solid #2877a1;outline-offset:3px}.omikuji-footnote{font-size:12px;color:#82766b}.omikuji-fortune{display:flex;align-items:center;justify-content:center;width:130px;min-height:172px;border:1px solid #d0b88a;outline:1px solid #d0b88a;outline-offset:-7px;border-radius:5px;background:#fffaf0;color:#973d40;font-size:49px;letter-spacing:.12em;writing-mode:vertical-rl;margin:20px auto 24px}.omikuji-error{color:#a22e35}
+</style>
+<dialog id="omikujiDialog" class="omikuji-dialog" aria-labelledby="omikujiTitle"><div id="omikujiCard" class="omikuji-card"></div></dialog>
+<script>
+let omikujiBusy = false;
+let omikujiOpener = null;
+function loadOmikuji(show) {
+  google.script.run.withSuccessHandler(status => {
+    state.omikuji = status;
+    const button = $('omikujiResultButton');
+    if (button) button.hidden = status.state !== 'drawn';
+    if (show && (status.state === 'available' || (show === true && status.state === 'drawn'))) showOmikuji(status);
+  }).withFailureHandler(error => showMessage(error.message || String(error), true)).getOmikujiStatus(state.token);
+}
+function closeOmikuji() {
+  if (omikujiBusy) return;
+  $('omikujiDialog').close();
+  if (omikujiOpener && omikujiOpener.isConnected) omikujiOpener.focus();
+}
+function showOmikuji(status) {
+  const card = $('omikujiCard');
+  if (status.state === 'drawn') {
+    const result = status.result;
+    card.innerHTML = `<p class="omikuji-eyebrow">あなたの新しい一年に</p><h2 id="omikujiTitle">おみくじの結果</h2><div class="omikuji-fortune">${escapeHtml(result.fortune)}</div><p>${escapeHtml(result.message)}</p><p class="omikuji-footnote">引いた日時：${escapeHtml(result.drawnAt)}（日本時間）</p><div class="omikuji-actions"><button class="omikuji-primary" onclick="closeOmikuji()">冬休み記録に戻る</button></div><p class="omikuji-footnote">「おみくじ結果」から、いつでも見返せます。</p>`;
+  } else {
+    card.innerHTML = `<p class="omikuji-eyebrow">HAPPY NEW YEAR · 2027</p><div class="omikuji-emblem" aria-hidden="true">✿</div><h2 id="omikujiTitle">新春おみくじ</h2><p>あけましておめでとう！<br>新しい一年のはじまりに、<br>あなたへのひとことを引いてみませんか。</p><p class="omikuji-deadline">引けるのは、一人一回だけ。<br>2027年1月8日 11:59まで（日本時間）</p><div class="omikuji-actions"><button class="omikuji-primary" onclick="submitOmikuji()">おみくじを引く</button><button onclick="closeOmikuji()">あとで引く</button></div><p class="omikuji-footnote">引いた結果は、あとから見返せます。</p>`;
+  }
+  const dialog = $('omikujiDialog');
+  if (!dialog.open) { omikujiOpener = document.activeElement; dialog.showModal(); }
+  card.querySelector('button').focus();
+}
+function submitOmikuji() {
+  if (omikujiBusy) return;
+  omikujiBusy = true;
+  $('omikujiCard').innerHTML = '<h2 id="omikujiTitle">おみくじを引いています</h2><p role="status">今年のひとことを、お届けします。</p>';
+  google.script.run.withSuccessHandler(status => {
+    omikujiBusy = false;
+    state.omikuji = status;
+    if (status.state === 'drawn') {
+      const button = $('omikujiResultButton');
+      if (button) button.hidden = false;
+      showOmikuji(status);
+    } else {
+      $('omikujiCard').innerHTML = '<h2 id="omikujiTitle">抽選期間外です</h2><p>引ける期間は2027年1月1日から1月8日11:59までです。</p><div class="omikuji-actions"><button onclick="closeOmikuji()">閉じる</button></div>';
+      $('omikujiCard').querySelector('button').focus();
+    }
+  }).withFailureHandler(error => {
+    omikujiBusy = false;
+    showOmikuji({state:'available'});
+    const message = document.createElement('p');
+    message.className = 'omikuji-error';
+    message.setAttribute('role', 'alert');
+    message.textContent = (error.message || String(error)) + ' 再試行しても二重抽選にはなりません。';
+    $('omikujiCard').appendChild(message);
+  }).drawOmikuji(state.token);
+}
+$('omikujiDialog').addEventListener('cancel', event => { event.preventDefault(); closeOmikuji(); });
+</script>

@@ -1,0 +1,427 @@
+<script>
+  const state = {
+    token: '',
+    user: null,
+    data: null,
+    selectedDate: '',
+    teacherTab: 'dashboard',
+    teacherDate: '',
+    teacherStudentId: '',
+  };
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function callServer(name, args, onSuccess) {
+    const runner = google.script.run
+      .withSuccessHandler(onSuccess)
+      .withFailureHandler(error => showMessage(error.message || String(error), true));
+    runner[name].apply(runner, args || []);
+  }
+
+  function showMessage(text, isError) {
+    const target = $('message') || $('loginMessage');
+    if (target) {
+      target.textContent = text || '';
+      target.style.color = isError ? '#dc2626' : '#047857';
+    }
+  }
+
+  function handleSetup() {
+    $('loginMessage').textContent = '初期設定中です...';
+    callServer('setupInitialSheets', [], result => {
+      $('loginMessage').textContent = result.message;
+      $('loginMessage').style.color = '#047857';
+      const setupButton = $('setupButton');
+      if (setupButton) setupButton.style.display = 'none';
+    });
+  }
+
+  function updateSetupButtonVisibility() {
+    callServer('getSetupStatus', [], result => {
+      const setupButton = $('setupButton');
+      if (!setupButton) return;
+      setupButton.style.display = result && result.completed ? 'none' : '';
+    });
+  }
+
+  function handleLogin() {
+    $('loginMessage').textContent = 'ログイン中です...';
+    callServer('login', [$('loginId').value, $('password').value], result => {
+      state.token = result.token;
+      state.omikuji = null;
+      state.user = result.user;
+      state.data = result.data;
+      state.selectedDate = pickDefaultDate();
+      renderApp();
+      if (state.user.role === '生徒') loadOmikuji('guide');
+    });
+  }
+
+  function refreshData(callback) {
+    callServer('getAppData', [state.token], result => {
+      state.user = result.user;
+      state.data = result.data;
+      renderApp();
+      if (callback) callback();
+    });
+  }
+
+  function renderApp() {
+    if (state.user.role === '先生') {
+      renderTeacher();
+    } else {
+      renderStudent();
+    }
+  }
+
+  function logout() {
+    state.token = '';
+    state.user = null;
+    state.data = null;
+    location.reload();
+  }
+
+  function pickDefaultDate() {
+    const today = state.data.today;
+    if (state.data.dates.includes(today)) return today;
+    return state.data.dates[0];
+  }
+
+  function getRecord(studentId, date) {
+    return (state.data.records || []).find(record => String(record['生徒ID']) === String(studentId) && record['日付'] === date);
+  }
+
+  function isSubmitted(record) {
+    return !!(record && record['就寝時間'] && record['起床時間'] && record['勉強時間_分'] && record['日記']);
+  }
+
+  function themeInfo(name) {
+    return state.data.themes.find(theme => theme.name === name) || state.data.themes[0];
+  }
+
+  function renderStudent() {
+    const theme = themeInfo(state.user.theme);
+    const style = theme.url ? `style="background-image: url('${escapeAttr(theme.url)}')"` : '';
+    $('app').innerHTML = `
+      <main class="student-app ${theme.className}" ${style}>
+        <div class="student-header panel">
+          <div>
+            <p class="eyebrow">${escapeHtml(state.data.settings['クラス名'])}</p>
+            <h1>${escapeHtml(state.user.name)}さんの冬休み記録</h1>
+          </div>
+          <button class="ghost no-print" onclick="logout()">ログアウト</button>
+          <button id="omikujiResultButton" class="ghost no-print" ${state.omikuji && state.omikuji.state === 'drawn' ? '' : 'hidden'} onclick="loadOmikuji(true)">おみくじ結果</button>
+        </div>
+        <div class="student-grid">
+          <section class="panel calendar-panel">
+            <h2>カレンダー</h2>
+            <p class="muted">入力する日を選んでください。未来の日付は入力できません。</p>
+            <div class="theme-picker">
+              ${state.data.themes.map(item => `
+                <button class="theme-card ${item.className} ${item.name === state.user.theme ? 'active' : ''}" ${item.url ? `style="background-image: linear-gradient(rgba(255,255,255,0.18), rgba(255,255,255,0.62)), url('${escapeAttr(item.url)}')"` : ''} onclick="changeTheme('${escapeAttr(item.name)}')">
+                  ${item.name === state.user.theme ? '✓ ' : ''}${escapeHtml(item.name)}
+                </button>
+              `).join('')}
+            </div>
+            <div class="calendar">
+              ${state.data.dates.map(date => renderCalendarDay(date)).join('')}
+            </div>
+          </section>
+          <section class="panel form-panel">
+            ${renderStudentForm()}
+          </section>
+        </div>
+      </main>
+    `;
+  }
+
+  function renderCalendarDay(date) {
+    const future = date > state.data.today;
+    const record = getRecord(state.user.loginId, date);
+    const selected = date === state.selectedDate;
+    const hasComment = !!(record && record['先生コメント']);
+    const status = hasComment ? '<span class="status comment">💬 コメント</span>' :
+      isSubmitted(record) ? '<span class="status done">✓ 入力済み</span>' :
+      '<span class="status missing">未入力</span>';
+    const label = formatMonthDay(date);
+    return `
+      <button class="day ${date === state.data.today ? 'today' : ''} ${selected ? 'selected' : ''}" ${future ? 'disabled' : ''} onclick="selectDate('${date}')">
+        <strong>${label}</strong>
+        ${future ? '<span class="status missing">これから</span>' : status}
+      </button>
+    `;
+  }
+
+  function renderStudentForm() {
+    const record = getRecord(state.user.loginId, state.selectedDate) || {};
+    const disabled = state.selectedDate > state.data.today;
+    return `
+      <h2>${formatLongDate(state.selectedDate)}</h2>
+      <p id="message" class="message"></p>
+      <label><span>昨夜の就寝時間</span><input id="bedtime" type="time" value="${escapeAttr(record['就寝時間'] || '')}" ${disabled ? 'disabled' : ''}></label>
+      <label><span>今朝の起床時間</span><input id="wakeTime" type="time" value="${escapeAttr(record['起床時間'] || '')}" ${disabled ? 'disabled' : ''}></label>
+      <label><span>勉強した時間（分）</span><input id="studyMinutes" type="number" min="0" max="1440" value="${escapeAttr(record['勉強時間_分'] || '')}" ${disabled ? 'disabled' : ''}></label>
+      <label><span>今日の日記（200文字以内）</span><textarea id="diary" maxlength="200" ${disabled ? 'disabled' : ''}>${escapeHtml(record['日記'] || '')}</textarea></label>
+      <div class="comment-box">
+        <strong>先生からのコメント</strong>
+        <p>${record['先生コメント'] ? escapeHtml(record['先生コメント']) : 'まだコメントはありません。'}</p>
+      </div>
+      <div class="form-actions">
+        <button class="primary" onclick="saveRecord()" ${disabled ? 'disabled' : ''}>保存</button>
+        <span class="muted">日記は <span id="diaryCount">${(record['日記'] || '').length}</span>/200 文字</span>
+      </div>
+    `;
+  }
+
+  function selectDate(date) {
+    state.selectedDate = date;
+    renderStudent();
+    const diary = $('diary');
+    if (diary) diary.addEventListener('input', () => $('diaryCount').textContent = diary.value.length);
+  }
+
+  function changeTheme(themeName) {
+    callServer('saveBackgroundTheme', [state.token, themeName], () => {
+      state.user.theme = themeName;
+      renderStudent();
+    });
+  }
+
+  function saveRecord() {
+    const payload = {
+      date: state.selectedDate,
+      bedtime: $('bedtime').value,
+      wakeTime: $('wakeTime').value,
+      studyMinutes: $('studyMinutes').value,
+      diary: $('diary').value,
+    };
+    callServer('saveStudentRecord', [state.token, payload], () => {
+      showMessage('保存しました。', false);
+      refreshData();
+    });
+  }
+
+  function renderTeacher() {
+    $('app').innerHTML = `
+      <main class="teacher-app">
+        <div class="teacher-layout">
+          <header class="teacher-header teacher-panel">
+            <div>
+              <p class="eyebrow">${escapeHtml(state.data.settings['クラス名'])}</p>
+              <h1>先生ダッシュボード</h1>
+            </div>
+            <button class="ghost no-print" onclick="logout()">ログアウト</button>
+          </header>
+          <nav class="tabs teacher-panel no-print">
+            ${teacherTabButton('dashboard', 'ダッシュボード')}
+            ${teacherTabButton('missing', '日付別未入力')}
+            ${teacherTabButton('students', '生徒別')}
+            ${teacherTabButton('diary', '日記・コメント')}
+            ${teacherTabButton('export', '出力')}
+          </nav>
+          <section class="teacher-panel">
+            <p id="message" class="message"></p>
+            ${renderTeacherTab()}
+          </section>
+        </div>
+      </main>
+    `;
+  }
+
+  function teacherTabButton(tab, label) {
+    return `<button class="tab ${state.teacherTab === tab ? 'active' : ''}" onclick="setTeacherTab('${tab}')">${label}</button>`;
+  }
+
+  function setTeacherTab(tab) {
+    state.teacherTab = tab;
+    renderTeacher();
+  }
+
+  function renderTeacherTab() {
+    if (state.teacherTab === 'missing') return renderMissingTab();
+    if (state.teacherTab === 'students') return renderStudentsTab();
+    if (state.teacherTab === 'diary') return renderDiaryTab();
+    if (state.teacherTab === 'export') return renderExportTab();
+    return renderDashboardTab();
+  }
+
+  function renderDashboardTab() {
+    const s = state.data.summary;
+    return `
+      <h2>全体の状況</h2>
+      <div class="stats">
+        <div class="stat"><span>生徒数</span><strong>${s.studentCount}</strong></div>
+        <div class="stat"><span>対象日数</span><strong>${s.targetDateCount}</strong></div>
+        <div class="stat"><span>提出率</span><strong>${s.submissionRate}%</strong></div>
+        <div class="stat"><span>未入力</span><strong>${s.missingCount}</strong></div>
+      </div>
+      <h3 style="margin-top:22px;">今日の入力状況</h3>
+      ${renderDateStatusTable(state.data.today)}
+    `;
+  }
+
+  function renderMissingTab() {
+    const date = state.teacherDate || clampDate(state.data.today);
+    state.teacherDate = date;
+    return `
+      <h2>日付別未入力者一覧</h2>
+      <div class="toolbar">
+        <label><span>日付</span><select onchange="state.teacherDate=this.value; renderTeacher();">${state.data.dates.filter(d => d <= state.data.today).map(d => `<option value="${d}" ${d === date ? 'selected' : ''}>${formatLongDate(d)}</option>`).join('')}</select></label>
+      </div>
+      ${renderDateStatusTable(date, true)}
+    `;
+  }
+
+  function renderDateStatusTable(date, missingOnly) {
+    const rows = state.data.students.map(student => {
+      const record = getRecord(student.loginId, date);
+      const done = isSubmitted(record);
+      if (missingOnly && done) return '';
+      return `
+        <tr>
+          <td>${escapeHtml(student.studentNo)}</td>
+          <td>${escapeHtml(student.name)}</td>
+          <td>${done ? '入力済み' : '<span class="danger-text">未入力</span>'}</td>
+          <td>${record && record['先生コメント'] ? 'あり' : ''}</td>
+        </tr>
+      `;
+    }).join('');
+    return `<table><thead><tr><th>番号</th><th>氏名</th><th>状態</th><th>コメント</th></tr></thead><tbody>${rows || '<tr><td colspan="4">未入力者はいません。</td></tr>'}</tbody></table>`;
+  }
+
+  function renderStudentsTab() {
+    const rows = state.data.students.map(student => {
+      const count = state.data.dates.filter(date => date <= state.data.today && isSubmitted(getRecord(student.loginId, date))).length;
+      const target = state.data.dates.filter(date => date <= state.data.today).length;
+      return `<tr><td>${student.studentNo}</td><td>${escapeHtml(student.name)}</td><td>${count}/${target}</td><td>${Math.round((count / Math.max(target, 1)) * 100)}%</td></tr>`;
+    }).join('');
+    return `<h2>生徒別提出状況</h2><table><thead><tr><th>番号</th><th>氏名</th><th>入力済み</th><th>提出率</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  function renderDiaryTab() {
+    const date = state.teacherDate || clampDate(state.data.today);
+    const studentId = state.teacherStudentId || (state.data.students[0] && state.data.students[0].loginId);
+    state.teacherDate = date;
+    state.teacherStudentId = studentId;
+    const student = state.data.students.find(s => s.loginId === studentId) || state.data.students[0];
+    const record = getRecord(studentId, date) || {};
+    return `
+      <h2>日記確認・コメント</h2>
+      <div class="toolbar">
+        <label><span>日付</span><select onchange="state.teacherDate=this.value; renderTeacher();">${state.data.dates.map(d => `<option value="${d}" ${d === date ? 'selected' : ''}>${formatLongDate(d)}</option>`).join('')}</select></label>
+        <label><span>生徒</span><select onchange="state.teacherStudentId=this.value; renderTeacher();">${state.data.students.map(s => `<option value="${s.loginId}" ${s.loginId === studentId ? 'selected' : ''}>${s.studentNo}番 ${escapeHtml(s.name)}</option>`).join('')}</select></label>
+      </div>
+      <div class="comment-box">
+        <strong>${escapeHtml(student.studentNo)}番 ${escapeHtml(student.name)} / ${formatLongDate(date)}</strong>
+        <p><b>就寝</b> ${record['就寝時間'] || '-'}　<b>起床</b> ${record['起床時間'] || '-'}　<b>勉強</b> ${record['勉強時間_分'] || '-'}分　<b>睡眠</b> ${sleepMinutes(record)}分</p>
+        <p>${record['日記'] ? escapeHtml(record['日記']) : '日記はまだ入力されていません。'}</p>
+      </div>
+      <label><span>先生コメント（200文字以内）</span><textarea id="teacherComment" maxlength="200">${escapeHtml(record['先生コメント'] || '')}</textarea></label>
+      <div class="form-actions"><button class="primary" onclick="saveComment()">コメント保存</button></div>
+    `;
+  }
+
+  function saveComment() {
+    callServer('saveTeacherComment', [state.token, {
+      studentId: state.teacherStudentId,
+      date: state.teacherDate,
+      comment: $('teacherComment').value,
+    }], () => {
+      showMessage('コメントを保存しました。', false);
+      refreshData();
+    });
+  }
+
+  function renderExportTab() {
+    return `
+      <h2>出力</h2>
+      <div class="toolbar no-print">
+        <label><span>生徒ごとの一覧</span><select id="exportStudent"><option value="">クラス全体</option>${state.data.students.map(s => `<option value="${s.loginId}">${s.studentNo}番 ${escapeHtml(s.name)}</option>`).join('')}</select></label>
+        <button class="small-button" onclick="downloadCsv()">CSV出力</button>
+        <button class="small-button" onclick="printView()">印刷用画面</button>
+      </div>
+      <p class="muted">CSVは表計算ソフトで開けます。印刷用画面は別ウィンドウで開きます。</p>
+      ${renderExportPreview()}
+    `;
+  }
+
+  function renderExportPreview() {
+    return `<table><thead><tr><th>日付</th><th>生徒ID</th><th>就寝</th><th>起床</th><th>勉強</th><th>日記</th><th>先生コメント</th></tr></thead><tbody>${state.data.records.slice(0, 20).map(record => `
+      <tr><td>${record['日付']}</td><td>${record['生徒ID']}</td><td>${record['就寝時間']}</td><td>${record['起床時間']}</td><td>${record['勉強時間_分']}</td><td>${escapeHtml(record['日記'] || '')}</td><td>${escapeHtml(record['先生コメント'] || '')}</td></tr>
+    `).join('')}</tbody></table>`;
+  }
+
+  function downloadCsv() {
+    const studentId = $('exportStudent').value;
+    const records = state.data.records.filter(record => !studentId || record['生徒ID'] === studentId);
+    const headers = ['日付', '生徒ID', '就寝時間', '起床時間', '勉強時間_分', '日記', '先生コメント'];
+    const csv = [headers.join(',')].concat(records.map(record => headers.map(h => csvCell(record[h] || '')).join(','))).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = studentId ? `winter-diary-${studentId}.csv` : 'winter-diary-class.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function printView() {
+    const studentId = $('exportStudent').value;
+    const students = studentId ? state.data.students.filter(s => s.loginId === studentId) : state.data.students;
+    const html = `
+      <html><head><title>印刷用</title><style>body{font-family:Meiryo,sans-serif;} table{width:100%;border-collapse:collapse;margin:16px 0;} th,td{border:1px solid #999;padding:6px;text-align:left;vertical-align:top;} h1{font-size:22px;} h2{font-size:18px;margin-top:24px;}</style></head>
+      <body><h1>${escapeHtml(state.data.settings['クラス名'])} 冬休み生活記録</h1>
+      ${students.map(student => `<h2>${student.studentNo}番 ${escapeHtml(student.name)}</h2><table><thead><tr><th>日付</th><th>就寝</th><th>起床</th><th>勉強</th><th>日記</th><th>先生コメント</th></tr></thead><tbody>${state.data.dates.map(date => {
+        const record = getRecord(student.loginId, date) || {};
+        return `<tr><td>${date}</td><td>${record['就寝時間'] || ''}</td><td>${record['起床時間'] || ''}</td><td>${record['勉強時間_分'] || ''}</td><td>${escapeHtml(record['日記'] || '')}</td><td>${escapeHtml(record['先生コメント'] || '')}</td></tr>`;
+      }).join('')}</tbody></table>`).join('')}
+      <script>window.print();<\/script></body></html>
+    `;
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+  }
+
+  function sleepMinutes(record) {
+    if (!record || !record['就寝時間'] || !record['起床時間']) return '-';
+    const [bh, bm] = record['就寝時間'].split(':').map(Number);
+    const [wh, wm] = record['起床時間'].split(':').map(Number);
+    let start = bh * 60 + bm;
+    let end = wh * 60 + wm;
+    if (end <= start) end += 24 * 60;
+    return end - start;
+  }
+
+  function clampDate(date) {
+    const available = state.data.dates.filter(d => d <= state.data.today);
+    return available.includes(date) ? date : available[available.length - 1] || state.data.dates[0];
+  }
+
+  function formatMonthDay(date) {
+    const [, m, d] = date.split('-');
+    return `${Number(m)}/${Number(d)}`;
+  }
+
+  function formatLongDate(date) {
+    const [y, m, d] = date.split('-');
+    return `${y}年${Number(m)}月${Number(d)}日`;
+  }
+
+  function csvCell(value) {
+    return `"${String(value).replace(/"/g, '""')}"`;
+  }
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+  }
+
+  function escapeAttr(value) {
+    return escapeHtml(value).replace(/`/g, '&#96;');
+  }
+
+  updateSetupButtonVisibility();
+</script>

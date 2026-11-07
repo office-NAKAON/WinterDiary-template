@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>新春おみくじ｜デザインプレビュー</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:'Yu Gothic',Meiryo,sans-serif;color:#313b46;background:#e9f1f6 url('雪景色と青空.png') center/cover fixed;min-height:100vh;padding:32px}button{font:inherit;cursor:pointer;min-height:44px;border:0;border-radius:12px;padding:12px 22px;font-weight:bold}button:focus-visible{outline:3px solid #2877a1;outline-offset:4px}button:disabled{cursor:wait;opacity:.65}.demo{max-width:1000px;margin:auto}.bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 22px;border-radius:16px;background:#ffffffdc}.bar h1{font-size:21px;margin:0}.note{font-size:13px;line-height:1.8;background:#ffffffdf;padding:14px 20px;border-radius:12px;max-width:620px;margin:24px auto}.primary{background:#963e40;color:white}.secondary{background:#f2eee8;color:#5c5150}.preview-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}dialog{border:1px solid #e2d7c5;border-radius:24px;padding:0;width:min(460px,calc(100% - 32px));max-height:calc(100dvh - 40px);overflow:auto;background:#fffdf8;color:#313b46;box-shadow:0 28px 90px #172d4555}dialog::backdrop{background:#152a3e66;backdrop-filter:blur(3px)}.card{text-align:center;padding:30px 32px 26px;background:radial-gradient(circle at 100% 0,#f6e9d3,transparent 35%)}.eyebrow{font-size:12px;color:#986c38;letter-spacing:.16em;margin:0 0 12px}.emblem{display:grid;place-items:center;width:84px;height:84px;margin:0 auto 20px;border-radius:50%;background:#f6eee2;border:1px solid #e5d1af;font-size:38px;color:#a14446}.card h2{font-size:26px;margin:0 0 16px;letter-spacing:.08em}.description{font-size:15px;line-height:1.9;margin:0 0 20px}.deadline{font-size:12px;line-height:1.8;color:#73685a;background:#f3efe7;padding:12px;border-radius:10px;margin:0 0 22px}.actions{display:grid;gap:10px}.footnote{font-size:12px;color:#82766b;margin:16px 0 0}.fortune{display:flex;align-items:center;justify-content:center;width:130px;min-height:172px;border:1px solid #d0b88a;outline:1px solid #d0b88a;outline-offset:-7px;border-radius:5px;background:#fffaf0;color:#973d40;font-size:49px;letter-spacing:.12em;writing-mode:vertical-rl;margin:20px auto 24px}.message{font-size:16px;line-height:2;margin:0 0 18px}.date{font-size:12px;color:#82766b;margin:0 0 20px}.error{color:#a22e35;font-size:14px;line-height:1.7;margin:14px 0}.drawing{padding:25px 0;font-size:16px;line-height:2}.drawing .emblem{animation:sway .65s ease-in-out infinite alternate}@keyframes sway{from{transform:rotate(-8deg)}to{transform:rotate(8deg)}}@media(prefers-reduced-motion:reduce){.drawing .emblem{animation:none}}@media(max-width:520px){body{padding:16px}.bar{flex-wrap:wrap}.card{padding:26px 22px}.bar h1{font-size:18px}}
+</style>
+<main class="demo">
+ <header class="bar"><h1>冬休み記録</h1><button id="resultButton" class="secondary" hidden>おみくじ結果</button></header>
+ <p class="note">デザイン確認用のプレビューです。本体・スプレッドシートには接続していません。抽選結果はこのページを開いている間だけ保持します。</p>
+ <div class="preview-actions"><button id="openGuide" class="primary">案内を表示</button><button id="reset" class="secondary">プレビューをリセット</button></div>
+</main>
+<dialog id="omikuji" aria-labelledby="dialogTitle"><div class="card" id="card"></div></dialog>
+<script>
+const dialog=document.getElementById('omikuji');
+const card=document.getElementById('card');
+const resultButton=document.getElementById('resultButton');
+let savedResult=null;
+let drawing=false;
+let opener=null;
+const results=[
+ {fortune:'大吉',message:'新しい挑戦が、すてきな発見につながりそう。小さな一歩を踏み出そう！'},
+ {fortune:'中吉',message:'毎日の積み重ねが力になる一年に。自分のペースで進もう！'},
+ {fortune:'小吉',message:'身近なところに、うれしいことが見つかりそう。小さな幸せを大切に！'},
+ {fortune:'吉',message:'友達や家族とのつながりが力になりそう。「ありがとう」を伝えてみよう！'}
+];
+function openDialog(){if(!dialog.open){opener=document.activeElement;dialog.showModal();}}
+function closeDialog(){dialog.close();opener?.focus();}
+function showGuide(){
+ if(savedResult){showResult();return;}
+ card.innerHTML=`<p class="eyebrow">HAPPY NEW YEAR · 2027</p><div class="emblem" aria-hidden="true">✿</div><h2 id="dialogTitle">新春おみくじ</h2><p class="description">あけましておめでとう！<br>新しい一年のはじまりに、<br>あなたへのひとことを引いてみませんか。</p><p class="deadline">引けるのは、一人一回だけ。<br>2027年1月8日 11:59まで（日本時間）</p><div class="actions"><button class="primary" id="draw">おみくじを引く</button><button class="secondary" id="later">あとで引く</button></div><p class="footnote">引いた結果は、あとから見返せます。</p>`;
+ document.getElementById('draw').onclick=draw;
+ document.getElementById('later').onclick=closeDialog;
+ openDialog();
+}
+async function draw(){
+ if(drawing)return;
+ drawing=true;
+ document.getElementById('reset').disabled=true;
+ document.getElementById('openGuide').disabled=true;
+ card.innerHTML='<h2 id="dialogTitle">おみくじを引いています</h2><div class="drawing" role="status"><div class="emblem" aria-hidden="true">✿</div>今年のひとことを、お届けします。</div>';
+ // プレビュー専用。組み込み時にはここをサーバー側の抽選呼び出しへ置換。
+ await new Promise(resolve=>setTimeout(resolve,1000));
+ savedResult={...results[Math.floor(Math.random()*results.length)],drawnAt:new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date())};
+ drawing=false;
+ document.getElementById('reset').disabled=false;
+ document.getElementById('openGuide').disabled=false;
+ resultButton.hidden=false;
+ showResult();
+}
+function showResult(){
+ card.innerHTML='<p class="eyebrow">あなたの新しい一年に</p><h2 id="dialogTitle">おみくじの結果</h2><div class="fortune" id="fortune"></div><p class="message" id="fortuneMessage"></p><p class="date" id="drawnAt"></p><div class="actions"><button class="primary" id="done">冬休み記録に戻る</button></div><p class="footnote">「おみくじ結果」から、いつでも見返せます。</p>';
+ document.getElementById('fortune').textContent=savedResult.fortune;
+ document.getElementById('fortuneMessage').textContent=savedResult.message;
+ document.getElementById('drawnAt').textContent='引いた日時：'+savedResult.drawnAt+'（日本時間）';
+ document.getElementById('done').onclick=closeDialog;
+ openDialog();
+ document.getElementById('done').focus();
+}
+dialog.addEventListener('cancel',event=>{event.preventDefault();if(!drawing)closeDialog();});
+document.getElementById('openGuide').onclick=showGuide;
+resultButton.onclick=showResult;
+document.getElementById('reset').onclick=()=>{savedResult=null;resultButton.hidden=true;showGuide();};
+showGuide();
+</script>
+</html>
